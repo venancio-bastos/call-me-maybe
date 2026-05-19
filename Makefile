@@ -1,8 +1,9 @@
-PYTHON = uv run python3
+UV = uv
+PYTHON = $(UV) run python3
 MODULE = src
 
 install:
-	uv sync
+	$(UV) sync
 
 run:
 	$(PYTHON) -m $(MODULE)
@@ -14,15 +15,18 @@ clean:
 	rm -rf __pycache__
 	rm -rf $(MODULE)/__pycache__
 	rm -rf .mypy_cache_
-# 	rm -rf .venv
+
+fclean: clean
+	rm -rf .venv
 
 lint:
-	uv run flake8 $(MODULE)
-	uv run mypy --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs $(MODULE)
+	$(UV) run flake8 $(MODULE)
+	$(UV) run mypy --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs $(MODULE)
 
 lint-strict:
-	uv run flake8 $(MODULE)
-	uv run mypy --strict $(MODULE)
+	$(UV) run flake8 $(MODULE)
+	$(UV) run mypy --strict $(MODULE)
 
-.PHONY: all install run debug clean lint lint-strict
-	
+re: fclean install
+
+.PHONY: all install run debug clean fclean lint lint-strict
