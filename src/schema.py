@@ -28,7 +28,7 @@ def load_functions_schema(filepath: str) -> List[FunctionSchema]:
     """
     with open(filepath, "r", encoding="utf-8") as f:
         raw_data = json.load(f)
-
+    
     schemas = []
     for item in raw_data:
         parsed_params = {}

@@ -32,25 +32,27 @@ class JSONGrammar:
         Check the actual state and returns a list of allowed strings.
         """
         if self.current_state == JSONState.START:
-            return ["{"]
+            return ["[\n  {"]
 
         if self.current_state == JSONState.PROMPT_KEY:
-            return ['"\n  "prompt": "']
+            return ['\n    "prompt": "']
 
         if self.current_state == JSONState.PROMPT_VALUE:
-            return []
+            return [self.prompt]
 
         if self.current_state == JSONState.NAME_KEY:
-            return ['", \n  "name": "']
+            return ['",\n    "name": "']
 
         if self.current_state == JSONState.NAME_VALUE:
             return [schema.name for schema in self.schemas]
 
         if self.current_state == JSONState.PARAMS_KEY:
-            return ['",\n  "parameters": {']
+            return ['",\n    "parameters": {']
 
         if self.current_state == JSONState.PARAMS_VALUE:
+            print(f"current_param: {self.current_param}")
             if self.current_param is None:
+                print(f"choosen_function: {self.choosen_function}")
                 if not self.choosen_function:
                     return []
                 return [f'"{k}": ' for k in self.choosen_function.parameters.keys()]
@@ -59,7 +61,7 @@ class JSONGrammar:
             return []
 
         if self.current_state == JSONState.END:
-            return ["}#n"]
+            return ["}  \n]"]
         return []
     
     def consume_token(self, token_str: str) -> None:
