@@ -1,4 +1,6 @@
 from enum import Enum, auto
+from typing import List, Optional, Any
+from src.schema import FunctionSchema, FunctionParameter
 
 
 class JSONState(Enum):
@@ -19,23 +21,33 @@ class JSONGrammar:
     """
     Manage the json generate state abd tell wich caracters are permitted.
     """
-    def __init__(self, prompt: str, schema_list: list) -> None:
-        self.prompt = prompt
-        self.schemas = schema_list
-        self.current_state = JSONState.START
-        self.choosen_function = None
-        self.current_param = None
-        self.text_buffer = ""
+    def __init__(self, prompt: str, schema_list: List[FunctionSchema]) -> None:
+        self.prompt: str = prompt
+        self.schemas: List[FunctionSchema] = schema_list
+        self.current_state: JSONState = JSONState.START
+        self.choosen_function: Optional[FunctionSchema] = None
+        self.current_param: Optional[FunctionParameter] = None
+        self.filled_parameters: List[str] = []
+        self.text_buffer: str = ""
     
+    def __repr__(self) -> str:
+        return (
+            f"current_state={repr(self.current_state)}\n"
+            f"choosen_function={repr(self.choosen_function)}\n"
+            f"current_param={repr(self.current_param)}\n"
+            f"filled_parameters={repr(self.filled_parameters)}\n"
+            f"text_buffer={repr(self.text_buffer)}\n"
+        )
+
     def get_allowed_strings(self) -> list[str]:
         """
         Check the actual state and returns a list of allowed strings.
         """
         if self.current_state == JSONState.START:
-            return ["[\n  {"]
+            return ["{\n"]
 
         if self.current_state == JSONState.PROMPT_KEY:
-            return ['\n    "prompt": "']
+            return ['    "prompt": "']
 
         if self.current_state == JSONState.PROMPT_VALUE:
             return [self.prompt]
@@ -50,18 +62,24 @@ class JSONGrammar:
             return ['",\n    "parameters": {']
 
         if self.current_state == JSONState.PARAMS_VALUE:
-            print(f"current_param: {self.current_param}")
-            if self.current_param is None:
-                print(f"choosen_function: {self.choosen_function}")
-                if not self.choosen_function:
-                    return []
-                return [f'"{k}": ' for k in self.choosen_function.parameters.keys()]
-            if self.current_param.type == "number":
-                return ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "-", ",", "}"]
-            return []
+            pass
+            # if self.current_param is None:
+            #     if not self.choosen_function:
+            #         return []
+            #     remaining = [
+            #         k for k in self.choosen_function.parameters.keys()
+            #         if k not in self.filled_parameters
+            #     ]
+            #     if not remaining:
+            #         return ["}"]
+            #     return [f'"{k}": ' for k in remaining]
+
+            # if self.current_param.type == "number":
+            #     return ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "-", ", ", "}"]
+            # return []
 
         if self.current_state == JSONState.END:
-            return ["}  \n]"]
+            return ["\n}"]
         return []
     
     def consume_token(self, token_str: str) -> None:
@@ -105,14 +123,20 @@ class JSONGrammar:
                 self.text_buffer = ""
 
         elif self.current_state == JSONState.PARAMS_VALUE:
+            
+            if "}" in self.text_buffer:
+                self.current_state = JSONState.END
+                self.text_buffer = ""
+            
             if self.current_param is None:
                 for param_name, param_obj in self.choosen_function.parameters.items():
-                    if f'"{param_name}": ' in self.text_buffer:
+                    if param_name in self.text_buffer and ":" in self.text_buffer:
                         self.current_param = param_obj
+                        self.filled_parameters.append(param_name)
                         self.text_buffer = ""
                         break
             else:
-                if "," in self.text_buffer:
+                if ", " in self.text_buffer:
                     self.current_param = None
                     self.text_buffer = ""
                 elif "}" in self.text_buffer:

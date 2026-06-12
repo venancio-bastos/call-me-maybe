@@ -1,11 +1,15 @@
 import json
-from typing import Dict
+from typing import Dict, Any
+from pydantic import BaseModel, Field
 
 
 class Vocabulary:
     """
     Generates a map between tokens in text and its respectives numeric IDs.
     """
+
+    vocab_dict: Dict[str, int] = Field(default_factory=dict)
+
     def __init__(self, model_sdk) -> None:
         """
         Open and save vocabolary in ram.
