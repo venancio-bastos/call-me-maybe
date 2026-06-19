@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class FunctionParameter(BaseModel):
     """
-    Represents the properties of individual parameters (ex: the type).
+    Represents the properties of individual parameters.
     """
     type: str
 

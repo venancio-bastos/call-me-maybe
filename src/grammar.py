@@ -29,15 +29,6 @@ class JSONGrammar:
         self.current_param: Optional[FunctionParameter] = None
         self.filled_parameters: List[str] = []
         self.text_buffer: str = ""
-    
-    def __repr__(self) -> str:
-        return (
-            f"current_state={repr(self.current_state)}\n"
-            f"choosen_function={repr(self.choosen_function)}\n"
-            f"current_param={repr(self.current_param)}\n"
-            f"filled_parameters={repr(self.filled_parameters)}\n"
-            f"text_buffer={repr(self.text_buffer)}\n"
-        )
 
     def get_allowed_strings(self) -> list[str]:
         """
@@ -62,21 +53,28 @@ class JSONGrammar:
             return ['",\n    "parameters": {']
 
         if self.current_state == JSONState.PARAMS_VALUE:
-            pass
-            # if self.current_param is None:
-            #     if not self.choosen_function:
-            #         return []
-            #     remaining = [
-            #         k for k in self.choosen_function.parameters.keys()
-            #         if k not in self.filled_parameters
-            #     ]
-            #     if not remaining:
-            #         return ["}"]
-            #     return [f'"{k}": ' for k in remaining]
+            remain = []
+            for k in self.choosen_function.parameters.keys():
+                if k not in self.filled_parameters:
+                    remain.append(k)
 
-            # if self.current_param.type == "number":
-            #     return ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "-", ", ", "}"]
-            # return []
+            if self.current_param == None:
+                if not remain:
+                    return ["}"]
+                else:
+                    allowed_keys = []
+                    for k in remain:
+                        allowed_keys.append(f'"{k}"')
+                    return allowed_keys
+            else:
+                allowed = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "."]
+                
+                if self.current_param.type == "number":
+                    if remain:
+                        allowed.append(",\n    ")
+                    else:
+                        allowed.append("\n    }")
+            return allowed
 
         if self.current_state == JSONState.END:
             return ["\n}"]
@@ -88,14 +86,14 @@ class JSONGrammar:
         change syntax state
         """
         self.text_buffer += token_str
-    
+
         if self.current_state == JSONState.START:
             if "{" in self.text_buffer:
                 self.current_state = JSONState.PROMPT_KEY
                 self.text_buffer = ""
 
         elif self.current_state == JSONState.PROMPT_KEY:
-            if '"prompt": "' in self.text_buffer:
+            if '    "prompt": "' in self.text_buffer:
                 self.current_state = JSONState.PROMPT_VALUE
                 self.text_buffer = ""
 
@@ -123,22 +121,20 @@ class JSONGrammar:
                 self.text_buffer = ""
 
         elif self.current_state == JSONState.PARAMS_VALUE:
-            
-            if "}" in self.text_buffer:
-                self.current_state = JSONState.END
-                self.text_buffer = ""
-            
-            if self.current_param is None:
+            if self.current_param == None:
                 for param_name, param_obj in self.choosen_function.parameters.items():
-                    if param_name in self.text_buffer and ":" in self.text_buffer:
+                    expected_key = f'"{param_name}"'
+
+                    if expected_key in self.text_buffer:
                         self.current_param = param_obj
-                        self.filled_parameters.append(param_name)
+                        self.filled_parameters.append(expected_key)
                         self.text_buffer = ""
                         break
             else:
-                if ", " in self.text_buffer:
+                if ',' in self.text_buffer:
                     self.current_param = None
                     self.text_buffer = ""
                 elif "}" in self.text_buffer:
                     self.current_state = JSONState.END
                     self.text_buffer = ""
+
