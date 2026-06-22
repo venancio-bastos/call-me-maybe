@@ -31,9 +31,6 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
                 mask.fill(False)
             else:
                 for string in allowed_strings:
-                    token = model.encode(string).tolist()[0]
-                    # print(f"Token: {token} | Token decode: {model.decode(token)} | String: {string}")
-
                     if string.startswith(grammar.text_buffer):
                         full_token = model.encode(string).tolist()[0]
                         text_buffer_token = model.encode(grammar.text_buffer).tolist()[0]
@@ -51,13 +48,14 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
             logits[mask] = -np.inf
             next_token_id = np.argmax(logits)
             next_token_str = model.decode(next_token_id)
-            # print(f"next_token_str: {next_token_str}")
             grammar.consume_token(next_token_str)
+            input_tokens.append(next_token_id)
             final_json.append(next_token_id)
 
+            print(f"Token gerado: {repr(next_token_str)} | Estado: {grammar.current_state}")
+            print(f"JSON Atual:\n{model.decode(final_json)}\n{'-'*40}")
 
-            # print(f"Final Json: \n{model.decode(final_json)}")
         return model.decode(final_json)
     except Exception as e:
-        # print(f"Error during JSON generation pipeline: {e}")
+        print(f"Error during JSON generation pipeline: {e}")
         return "{}"
