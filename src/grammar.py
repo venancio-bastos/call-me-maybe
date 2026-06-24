@@ -15,6 +15,7 @@ class JSONState(Enum):
     PARAMS_KEY = auto()
     PARAMS_VALUE = auto()
     END = auto()
+    FINISHED = auto()
 
 
 class JSONGrammar:
@@ -54,6 +55,7 @@ class JSONGrammar:
 
         if self.current_state == JSONState.PARAMS_VALUE:
             remain = []
+
             for k in self.choosen_function.parameters.keys():
                 if k not in self.filled_parameters:
                     remain.append(k)
@@ -62,20 +64,32 @@ class JSONGrammar:
                 if not remain:
                     return ["}"]
                 else:
-                    allowed_keys = []
-                    for k in remain:
-                        allowed_keys.append(f'"{k}"')
-                    return allowed_keys
+                    first_key = remain[0]
+                    return [f'"{first_key}": ']
             else:
-                allowed = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "."]
                 
                 if self.current_param.type == "number":
+                    allowed = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "."]
+                    
                     if remain:
                         allowed.append(",\n    ")
                     else:
                         allowed.append("\n    }")
-            return allowed
-
+                    return allowed
+            
+                elif self.current_param.type == "boolean":
+                    allowed = ["true", "false"]
+                    if remain:
+                        allowed.append(",\n    ")
+                    else:
+                        allowed.append("\n    }")
+                    return allowed
+                
+                elif self.current_param.type == "string":
+                    if not self.text_buffer.startswith('"'):
+                        return ['"']
+                    return []
+            return []
         if self.current_state == JSONState.END:
             return ["\n}"]
         return []
@@ -123,18 +137,31 @@ class JSONGrammar:
         elif self.current_state == JSONState.PARAMS_VALUE:
             if self.current_param == None:
                 for param_name, param_obj in self.choosen_function.parameters.items():
-                    expected_key = f'"{param_name}"'
+                    expected_key = f'"{param_name}": '
 
                     if expected_key in self.text_buffer:
                         self.current_param = param_obj
-                        self.filled_parameters.append(expected_key)
+                        self.filled_parameters.append(param_name)
                         self.text_buffer = ""
                         break
             else:
-                if ',' in self.text_buffer:
-                    self.current_param = None
-                    self.text_buffer = ""
-                elif "}" in self.text_buffer:
-                    self.current_state = JSONState.END
-                    self.text_buffer = ""
+                if self.current_param.type == "string":
+                    if self.text_buffer.count('"') >= 2:
+                        if ',' in self.text_buffer:
+                            self.current_param = None
+                            self.text_buffer = ""
+                        elif "}" in self.text_buffer:
+                            self.current_state = JSONState.END
+                            self.text_buffer = ""
+                else:
+                    if ',' in self.text_buffer:
+                        self.current_param = None
+                        self.text_buffer = ""
+                    elif "}" in self.text_buffer:
+                        self.current_state = JSONState.END
+                        self.text_buffer = ""
+        elif self.current_state == JSONState.END:
+            if "}" in self.text_buffer:
+                self.current_state = JSONState.FINISHED
+                self.text_buffer = ""
 

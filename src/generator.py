@@ -10,17 +10,18 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
     Execute the main constrained decoding loop to generate a valid JSON.
     """
     try:
-        vocab = Vocabulary(model)
+        system_context = ""
+        for schema in schemas:
+            system_context += f"- {schema.name}: {schema.description}\n"
+        full_input = f"Available functions:\n{system_context}\nQuestion: {prompt}\nOutput JSON:\n"
         grammar = JSONGrammar(prompt=prompt, schema_list=schemas)
 
-        initial_tokens: List[int] = model.encode(prompt).tolist()[0]
+        initial_tokens: List[int] = model.encode(full_input).tolist()[0]
         input_tokens: List[int] = list(initial_tokens)
-        final_json: List[int] = []        
+        final_json: List[int] = []
 
-        while grammar.current_state != JSONState.END:
-            # print(f"Buffer: {grammar.text_buffer}")
+        while grammar.current_state != JSONState.FINISHED:
             logits = np.array(model.get_logits_from_input_ids(input_tokens))
-
             allowed_strings = grammar.get_allowed_strings()
             
             vocab_size = logits.shape[0]
@@ -40,10 +41,10 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
                         if idx < len(full_token):
                             allowed_token_ids.append(full_token[idx])
 
-                        if allowed_token_ids:
-                            mask[allowed_token_ids] = False
-                        else:
-                            mask.fill(False)
+                if allowed_token_ids:
+                    mask[allowed_token_ids] = False
+                else:
+                    mask.fill(False)
                 
             logits[mask] = -np.inf
             next_token_id = np.argmax(logits)
@@ -51,9 +52,6 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
             grammar.consume_token(next_token_str)
             input_tokens.append(next_token_id)
             final_json.append(next_token_id)
-
-            print(f"Token gerado: {repr(next_token_str)} | Estado: {grammar.current_state}")
-            print(f"JSON Atual:\n{model.decode(final_json)}\n{'-'*40}")
 
         return model.decode(final_json)
     except Exception as e:

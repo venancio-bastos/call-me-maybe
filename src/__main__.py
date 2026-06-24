@@ -1,29 +1,75 @@
 import os
+import json
+import argparse
 from llm_sdk import Small_LLM_Model
 from src.generator import generate_json
 from src.schema import load_functions_schema
 
 
 def main() -> None:
-    schema_path = "functions_definition.json"
+    parser = argparse.ArgumentParser(description="Call Me Maybe - Constrained Decoding Pipeline")
+    parser.add_argument(
+        "--functions_definition", 
+        default="data/input/functions_definition.json",
+        help="Path to the functions definition file"
+    )
+    parser.add_argument(
+        "--input", 
+        default="data/input/function_calling_tests.json",
+        help="Path to the input batch prompts file"
+    )
+    parser.add_argument(
+        "--output", 
+        default="data/output/function_calling_results.json",
+        help="Path to save the generated JSON array"
+    )
+    args = parser.parse_args()
 
-    if not os.path.exists(schema_path):
-        print(f"Error: File {schema_path} was not found")
+    if not os.path.exists(args.functions_definition):
+        print(f"Error: Schema file {args.functions_definition} not found.")
+        return
+    schemas = load_functions_schema(args.functions_definition)
+
+    if not os.path.exists(args.input):
+        print(f"Error: Input file target {args.input} not found.")
         return
 
-    print("Loading functions definitions")
-    schemas = load_functions_schema(schema_path)
+    try:
+        with open(args.input, "r", encoding="utf-8") as f:
+            test_cases = json.load(f)
+    except json.JSONDecodeError:
+        print(f"Error: Input file {args.input} contains malformed JSON markup.")
+        return
 
-    print("Initializing LLM (Qwen) model...")
+    print("Initializing LLM (Qwen) infrastructure...")
     model = Small_LLM_Model()
+    
+    results_array = []
 
-    prompt_teste = "What is the sum of 2 and 3?"
-    print(f"\nPrompt enviado: '{prompt_teste}'")
+    print(f"\nProcessing {len(test_cases)} prompts from input catalog...")
+    for idx, item in enumerate(test_cases, start=1):
+        prompt_string = item.get("prompt")
+        if not prompt_string:
+            print(f"Skipping index {idx}: Key 'prompt' is missing.")
+            continue
 
-    json_final = generate_json(model=model, prompt=prompt_teste, schemas=schemas)
+        print(f"[{idx}/{len(test_cases)}] Generating constrained schema call for: '{prompt_string}'")
+        raw_json_output = generate_json(model=model, prompt=prompt_string, schemas=schemas)
+        
+        try:
+            parsed_object = json.loads(raw_json_output)
+            results_array.append(parsed_object)
+        except Exception as parse_error:
+            print(f"Warning: Output string failed structural parsing checks: {parse_error}")
 
-    print("\n--- JSON GERADO COM SUCESSO ---")
-    print(json_final)
+    output_dir = os.path.dirname(args.output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    with open(args.output, "w", encoding="utf-8") as out_file:
+        json.dump(results_array, out_file, indent=4)
+
+    print(f"\n--- EXECUTION FINISHED: Results written to {args.output} ---")
 
 
 if __name__ == "__main__":
