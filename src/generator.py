@@ -12,8 +12,17 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
     try:
         system_context = ""
         for schema in schemas:
-            system_context += f"- {schema.name}: {schema.description}\n"
-        full_input = f"Available functions:\n{system_context}\nQuestion: {prompt}\nOutput JSON:\n"
+            params_desc = ", ".join([f"{k} ({v.type})" for k, v in schema.parameters.items()])
+            system_context += f"- Function: {schema.name}\n  Description: {schema.description}\n  Parameters: {{{params_desc}}}\n"
+
+        full_input = (
+            "<|im_start|>system\n"
+            "You are a function selection assistant. Based on the user question, identify the correct function name and extract its parameters into a valid JSON.\n"
+            f"Available functions:\n{system_context}<|im_end|>\n"
+            f"<|im_start|>user\n{prompt}<|im_end|>\n"
+            "<|im_start|>assistant\n{"
+        )
+        
         grammar = JSONGrammar(prompt=prompt, schema_list=schemas)
 
         initial_tokens: List[int] = model.encode(full_input).tolist()[0]
@@ -49,6 +58,7 @@ def generate_json(model: Any, prompt: str, schemas: List[FunctionSchema]) -> str
             logits[mask] = -np.inf
             next_token_id = np.argmax(logits)
             next_token_str = model.decode(next_token_id)
+
             grammar.consume_token(next_token_str)
             input_tokens.append(next_token_id)
             final_json.append(next_token_id)

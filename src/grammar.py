@@ -24,7 +24,6 @@ class JSONGrammar:
     Manages the JSON generation state and determines which characters are permitted.
     """
     def __init__(self, prompt: str, schema_list: List[FunctionSchema]) -> None:
-        # Safely escape quotes and backslashes in the user prompt to prevent JSON breakage
         self.prompt: str = json.dumps(prompt)[1:-1]
         self.schemas: List[FunctionSchema] = schema_list
         self.current_state: JSONState = JSONState.START
@@ -49,7 +48,7 @@ class JSONGrammar:
             elif char == '\\':
                 escaped = True
             elif char == '"':
-                return True # Found the actual closing quote
+                return True
         return False
 
     def get_allowed_strings(self) -> list[str]:
@@ -83,14 +82,11 @@ class JSONGrammar:
                 else:
                     return [f'"{remain[0]}": ']
             else:
-                # 1. Number and Integer validation
                 if self.current_param.type in ["number", "integer"]:
                     if self.text_buffer == "":
                         return ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-"]
                     
                     allowed_chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-                    
-                    # Decimals are only allowed for strictly "number" types, not "integer"
                     if self.current_param.type == "number" and "." not in self.text_buffer:
                         allowed_chars.append(".")
                     
@@ -102,28 +98,23 @@ class JSONGrammar:
                         else:
                             allowed_strings.append(self.text_buffer + "}")
                     return allowed_strings
-            
-                # 2. Boolean validation
                 elif self.current_param.type == "boolean":
                     if remain:
                         return ["true,", "false,"]
                     else:
                         return ["true}", "false}"]
-                
-                # 3. String validation
                 elif self.current_param.type == "string":
-                    # Force opening quote if missing
                     if not self.text_buffer.startswith('"'):
                         return ['"']
-                    
-                    # Once closed, enforce the next structural delimiter
+
                     if self._is_string_closed(self.text_buffer):
+                        last_quote = self.text_buffer.rfind('"')
+                        base_string = self.text_buffer[:last_quote + 1]
+
                         if remain:
-                            return [self.text_buffer + ","]
+                            return [base_string + " ,"]
                         else:
-                            return [self.text_buffer + "}"]
-                    
-                    # Yield empty list to allow the model to freely generate string content
+                            return [base_string + " }"]
                     return []
                     
         if self.current_state == JSONState.END:
@@ -173,7 +164,6 @@ class JSONGrammar:
 
         elif self.current_state == JSONState.PARAMS_VALUE:
             if self.current_param is None:
-                # Look for the next parameter key
                 for param_name, param_obj in self.choosen_function.parameters.items():
                     expected_key = f'"{param_name}": '
                     if expected_key in self.text_buffer:
@@ -182,24 +172,21 @@ class JSONGrammar:
                         self.text_buffer = ""
                         break
             else:
-                # Se for string, só procuramos delimitadores APÓS a aspa de fecho
                 if self.current_param.type == "string":
                     if self._is_string_closed(self.text_buffer):
-                        # Encontra a posição da aspa de fecho real
-                        # (O teu _is_string_closed já é bom, vamos apenas isolar o que vem depois)
                         last_quote = self.text_buffer.rfind('"')
-                        after_string = self.text_buffer[last_quote+1:]
+                        after_string = self.text_buffer[last_quote + 1:]
                         
-                        if ',' in after_string:
-                            self.current_param = None
-                            self.text_buffer = ""
-                        elif '}' in after_string:
+                        if '}' in after_string:
                             remain = [k for k in self.choosen_function.parameters.keys() if k not in self.filled_parameters]
                             if not remain:
                                 self.current_state = JSONState.END
+                                self.current_param = None
                                 self.text_buffer = ""
+                        elif ',' in after_string:
+                            self.current_param = None
+                            self.text_buffer = ""
                 else:
-                    # Para números e booleanos, o teu código original está ótimo
                     if ',' in self.text_buffer:
                         self.current_param = None
                         self.text_buffer = ""
