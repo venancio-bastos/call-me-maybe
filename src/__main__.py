@@ -58,6 +58,22 @@ def main() -> None:
         
         try:
             parsed_object = json.loads(raw_json_output)
+
+            func_name = parsed_object.get("name")
+            params = parsed_object.get("parameters", {})
+
+            matching_schema = next((s for s in schemas if s.name == func_name), None)
+            if matching_schema and isinstance(params, dict):
+                for param_name, val in params.items():
+                    if param_name in matching_schema.parameters:
+                        expected_type = matching_schema.parameters[param_name].type
+                        
+                        if expected_type == "number" and isinstance(val, (int, float)):
+                            params[param_name] = float(val)
+                        
+                        elif expected_type == "integer" and isinstance(val, (int, float)):
+                            params[param_name] = int(val)
+
             results_array.append(parsed_object)
         except Exception as parse_error:
             print(f"Warning: Output string failed structural parsing checks: {parse_error}")
@@ -67,7 +83,7 @@ def main() -> None:
         os.makedirs(output_dir, exist_ok=True)
 
     with open(args.output, "w", encoding="utf-8") as out_file:
-        json.dump(results_array, out_file, indent=4)
+        json.dump(results_array, out_file, indent=2)
 
     print(f"\n--- EXECUTION FINISHED: Results written to {args.output} ---")
 
