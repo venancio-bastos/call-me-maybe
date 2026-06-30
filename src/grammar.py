@@ -21,7 +21,8 @@ class JSONState(Enum):
 
 class JSONGrammar:
     """
-    Manages the JSON generation state and determines which characters are permitted.
+    Manages the JSON generation state and
+    determines which characters are permitted.
     """
     def __init__(self, prompt: str, schema_list: List[FunctionSchema]) -> None:
         self.prompt: str = json.dumps(prompt)[1:-1]
@@ -34,12 +35,13 @@ class JSONGrammar:
 
     def _is_string_closed(self, text: str) -> bool:
         """
-        Checks if a JSON string value is fully closed, 
+        Checks if a JSON string value is
+        fully closed,
         ignoring escaped internal quotes (\").
         """
         if not text.startswith('"'):
             return False
-        
+
         escaped = False
         for i in range(1, len(text)):
             char = text[i]
@@ -74,7 +76,10 @@ class JSONGrammar:
             return ['",\n    "parameters": {']
 
         if self.current_state == JSONState.PARAMS_VALUE:
-            remain = [k for k in self.choosen_function.parameters.keys() if k not in self.filled_parameters]
+            remain = [
+                k for k in self.choosen_function.parameters.keys()
+                if k not in self.filled_parameters
+            ]
 
             if self.current_param is None:
                 if not remain:
@@ -84,14 +89,31 @@ class JSONGrammar:
             else:
                 if self.current_param.type in ["number", "integer"]:
                     if self.text_buffer == "":
-                        return ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-"]
-                    
-                    allowed_chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-                    if self.current_param.type == "number" and "." not in self.text_buffer:
+                        return [
+                            "0",
+                            "1",
+                            "2",
+                            "3",
+                            "4",
+                            "5",
+                            "6",
+                            "7",
+                            "8",
+                            "9",
+                            "-"
+                        ]
+
+                    allowed_chars = [
+                        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+                    ]
+                    if (self.current_param.type == "number" and
+                            "." not in self.text_buffer):
                         allowed_chars.append(".")
-                    
-                    allowed_strings = [self.text_buffer + c for c in allowed_chars]
-                    
+
+                    allowed_strings = [
+                        self.text_buffer + c for c in allowed_chars
+                    ]
+
                     if self.text_buffer[-1] not in ["-", "."]:
                         if remain:
                             allowed_strings.append(self.text_buffer + ",")
@@ -116,15 +138,15 @@ class JSONGrammar:
                         else:
                             return [base_string + " }"]
                     return []
-                    
+
         if self.current_state == JSONState.END:
             return ["\n}"]
-        
+
         return []
-    
+
     def consume_token(self, token_str: str) -> None:
         """
-        Consumes the generated token, updates the buffer, 
+        Consumes the generated token, updates the buffer,
         and manages syntax state transitions.
         """
         self.text_buffer += token_str
@@ -164,7 +186,9 @@ class JSONGrammar:
 
         elif self.current_state == JSONState.PARAMS_VALUE:
             if self.current_param is None:
-                for param_name, param_obj in self.choosen_function.parameters.items():
+                for param_name, param_obj in (
+                    self.choosen_function.parameters.items()
+                ):
                     expected_key = f'"{param_name}": '
                     if expected_key in self.text_buffer:
                         self.current_param = param_obj
@@ -176,9 +200,13 @@ class JSONGrammar:
                     if self._is_string_closed(self.text_buffer):
                         last_quote = self.text_buffer.rfind('"')
                         after_string = self.text_buffer[last_quote + 1:]
-                        
+
                         if '}' in after_string:
-                            remain = [k for k in self.choosen_function.parameters.keys() if k not in self.filled_parameters]
+                            remain = [
+                                k for k in
+                                self.choosen_function.parameters.keys()
+                                if k not in self.filled_parameters
+                            ]
                             if not remain:
                                 self.current_state = JSONState.END
                                 self.current_param = None
@@ -191,7 +219,11 @@ class JSONGrammar:
                         self.current_param = None
                         self.text_buffer = ""
                     elif '}' in self.text_buffer:
-                        remain = [k for k in self.choosen_function.parameters.keys() if k not in self.filled_parameters]
+                        remain = [
+                            k for k in
+                            self.choosen_function.parameters.keys()
+                            if k not in self.filled_parameters
+                        ]
                         if not remain:
                             self.current_state = JSONState.END
                             self.text_buffer = ""
